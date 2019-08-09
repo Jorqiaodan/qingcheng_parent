@@ -5,10 +5,12 @@ import com.alibaba.fastjson.JSON;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import com.qingcheng.dao.OrderItemMapper;
+import com.qingcheng.dao.OrderLogMapper;
 import com.qingcheng.dao.OrderMapper;
 import com.qingcheng.entity.PageResult;
 import com.qingcheng.pojo.order.Order;
 import com.qingcheng.pojo.order.OrderItem;
+import com.qingcheng.pojo.order.OrderLog;
 import com.qingcheng.service.goods.SkuService;
 import com.qingcheng.service.order.CartService;
 import com.qingcheng.service.order.OrderService;
@@ -140,6 +142,8 @@ public class OrderServiceImpl implements OrderService {
 
             orderMapper.insert(order);
 
+            //  向订单队列添加订单号，供过期关闭订单
+            rabbitTemplate.convertAndSend("","queue.ordercreate",order.getId());
 
             //4.保存订单明细表
             //打折比例
@@ -186,6 +190,59 @@ public class OrderServiceImpl implements OrderService {
     public void delete(String id) {
         orderMapper.deleteByPrimaryKey(id);
     }
+
+    @Autowired
+    private OrderLogMapper orderLogMapper;
+    @Override
+    /**
+     * 支付完成更新购物车状态
+     */
+    @Transactional
+    public void updatePayStatus(String orderId, String transactionId) {
+        //1.参数校验
+        Order order = orderMapper.selectByPrimaryKey(orderId);
+        if(order!=null){
+            //2.修改订单状态
+            if("0".equals(order.getPayStatus())&&"0".equals(order.getOrderStatus())){
+                order.setPayStatus("1");
+                order.setOrderStatus("1");
+                order.setPayTime(new Date());
+                order.setUpdateTime(new Date());
+                order.setTransactionId(transactionId);//流水号
+                order.setSourceType("1");//订单来源web
+                order.setPayType("1");//在线支付
+                order.setPayStatus("1");
+                orderMapper.updateByPrimaryKeySelective(order);//更新回去
+            }
+        }
+        //3.修改订单日志
+        OrderLog orderLog=new OrderLog();
+        IdWorker idWorker=new IdWorker();
+        orderLog.setId(idWorker.nextId()+"");//id
+        orderLog.setOperater("system");
+        orderLog.setOperateTime(new Date());
+        orderLog.setOrderId(Long.valueOf(orderId));
+        orderLog.setOrderStatus("1");
+        orderLog.setConsignStatus("0");
+        orderLog.setRemarks("微信支付流水"+transactionId);
+        orderLogMapper.insert(orderLog);
+    }
+
+    @Override
+    /**
+     * g关闭未支付订单
+     */
+    public void closeUnPay(Order order) {
+        order.setOrderStatus("0");//关闭订单
+        order.setPayStatus("0");//支付状态修改0
+        order.setUpdateTime(new Date());
+        order.setCloseTime(new Date());
+        orderMapper.updateByPrimaryKeySelective(order);
+        //修改日志 。。。
+
+
+    }
+
 
     /**
      * 构建查询条件

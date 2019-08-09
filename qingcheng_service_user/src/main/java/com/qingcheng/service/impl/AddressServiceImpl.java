@@ -99,6 +99,7 @@ public class AddressServiceImpl implements AddressService {
         Example example=new Example(Address.class);
         Example.Criteria criteria = example.createCriteria();
         criteria.andEqualTo("username",username);
+        example.setOrderByClause("is_default desc");
         return addressMapper.selectByExample(example);
     }
 

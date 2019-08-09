@@ -33,4 +33,16 @@ public interface OrderService {
 
     public void delete(String id);
 
+    /**
+     * 微信支付后更新订单状态
+     * @param out_trade_no
+     * @param transaction_id
+     */
+    void updatePayStatus(String out_trade_no, String transaction_id);
+
+    /**
+     * 关闭未支付订单
+     * @param
+     */
+    void closeUnPay(Order order);
 }

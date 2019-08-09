@@ -24,7 +24,7 @@ public class IndexController {
     @GetMapping("/index")
     public String index(Model model){
         //得到首页广告轮播图列表
-        List<Ad> lbtList = adService.findByPosition("index_lb");
+        List<Ad> lbtList = adService.findByPosition("web_index_lb");
         model.addAttribute("lbt",lbtList);
 
         //分类导航
